@@ -1,12 +1,62 @@
 package edu.cmu.cs214.lab10.harness;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+import edu.cmu.cs214.lab10.domain.Booking;
+import edu.cmu.cs214.lab10.domain.BookingStatus;
+import edu.cmu.cs214.lab10.domain.Room;
+import edu.cmu.cs214.lab10.service.BookingService;
+import edu.cmu.cs214.lab10.store.InMemoryBookingStore;
+import java.util.List;
+import org.junit.jupiter.api.Test;
+
 /**
  * Where your concurrency tests go.
  *
- * <p>Empty on purpose. The wiring you need is written out below; what to aim it
- * at, and what scenario to drive through it, is yours to work out.
+ * <p>The wiring comments below explain how the tests here use {@link PausingStore}.
  */
 class RaceTest {
+
+    private static final String WEAN = "WEH-5409";
+    private static final int START_MINUTE = 540;
+    private static final int END_MINUTE = 600;
+    private static final List<Room> ROOMS = List.of(new Room(WEAN, "Wean 5409", 12));
+
+    /**
+     * RES-4471: the schedule predicted in RACE.md. A parks holding the answer
+     * from the first hasOverlap, B books the slot, then A resumes and inserts
+     * on that stale answer. The assertion is on the end state only, so it stays
+     * meaningful after book() changes underneath it.
+     */
+    @Test
+    void twoCustomersBookingTheSameSlotLeaveOneConfirmed() throws InterruptedException {
+        InMemoryBookingStore real = new InMemoryBookingStore();
+        PausingStore gated = new PausingStore(real, "hasOverlap", 1);
+        BookingService service = new BookingService(gated, ROOMS);
+
+        Thread customerA = new Thread(() -> service.book(WEAN, START_MINUTE, END_MINUTE), "customer-A");
+        customerA.start();
+        gated.awaitPaused();
+
+        Thread customerB = new Thread(() -> service.book(WEAN, START_MINUTE, END_MINUTE), "customer-B");
+        customerB.start();
+        customerB.join(PausingStore.TIMEOUT_MILLIS);
+
+        gated.release();
+        customerA.join(PausingStore.TIMEOUT_MILLIS);
+
+        assertEquals(1, confirmedCount(real));
+    }
+
+    private static int confirmedCount(InMemoryBookingStore store) {
+        int count = 0;
+        for (Booking booking : store.bookingsForRoom(WEAN)) {
+            if (booking.status() == BookingStatus.CONFIRMED && booking.overlaps(START_MINUTE, END_MINUTE)) {
+                count++;
+            }
+        }
+        return count;
+    }
 
     // ------------------------------------------------------------------
     // Wiring example 1: wrap the store

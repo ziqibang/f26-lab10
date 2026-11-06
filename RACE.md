@@ -114,6 +114,185 @@ you missed. Leave the table as you first wrote it.
 that pair pins the schedule you predicted, and the output of two separate
 runs (assertion failure and log lines).
 
+`RaceTest.twoCustomersBookingTheSameSlotLeaveOneConfirmed` uses
+`new PausingStore(real, "hasOverlap", 1)`. Call 1 is A's check: `awaitPaused()`
+runs before B starts, so A must make it, and it parks A after the real call,
+holding `false`. B then checks and inserts inside that gap, and A inserts on the
+stale answer. Both runs are red on the invariant assertion at `RaceTest.java:48`,
+with `Errors: 0`. The test took 0.084 s and 0.069 s, far below the 2 s
+`PausingStore` timeout, so no timeout path was taken.
+
+#### Run 1
+
+```text
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] ------------------< edu.cmu.cs214:lab10-reservations >------------------
+[INFO] Building lab10-reservations 1.0.0
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- resources:3.4.0:resources (default-resources) @ lab10-reservations ---
+[INFO] skip non existing resourceDirectory C:\Users\ziqix\downloads\f26-lab10\src\main\resources
+[INFO] 
+[INFO] --- compiler:3.13.0:compile (default-compile) @ lab10-reservations ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- resources:3.4.0:testResources (default-testResources) @ lab10-reservations ---
+[INFO] skip non existing resourceDirectory C:\Users\ziqix\downloads\f26-lab10\src\test\resources
+[INFO] 
+[INFO] --- compiler:3.13.0:testCompile (default-testCompile) @ lab10-reservations ---
+[INFO] Recompiling the module because of changed source code.
+[INFO] Compiling 3 source files with javac [debug release 21] to target\test-classes
+[INFO] 
+[INFO] --- surefire:3.2.5:test (default-test) @ lab10-reservations ---
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO] 
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running edu.cmu.cs214.lab10.harness.RaceTest
+2026-11-06T19:44:12.415Z INFO booking.confirmed booking=bk-1 room=WEH-5409 start=540 end=600
+2026-11-06T19:44:12.425Z INFO booking.confirmed booking=bk-2 room=WEH-5409 start=540 end=600
+[ERROR] Tests run: 1, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 0.118 s <<< FAILURE! -- in edu.cmu.cs214.lab10.harness.RaceTest
+[ERROR] edu.cmu.cs214.lab10.harness.RaceTest.twoCustomersBookingTheSameSlotLeaveOneConfirmed -- Time elapsed: 0.084 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: expected: <1> but was: <2>
+	at org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:151)
+	at org.junit.jupiter.api.AssertionFailureBuilder.buildAndThrow(AssertionFailureBuilder.java:132)
+	at org.junit.jupiter.api.AssertEquals.failNotEqual(AssertEquals.java:197)
+	at org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:150)
+	at org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:145)
+	at org.junit.jupiter.api.Assertions.assertEquals(Assertions.java:531)
+	at edu.cmu.cs214.lab10.harness.RaceTest.twoCustomersBookingTheSameSlotLeaveOneConfirmed(RaceTest.java:48)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+
+[INFO] 
+[INFO] Results:
+[INFO] 
+[ERROR] Failures: 
+[ERROR]   RaceTest.twoCustomersBookingTheSameSlotLeaveOneConfirmed:48 expected: <1> but was: <2>
+[INFO] 
+[ERROR] Tests run: 1, Failures: 1, Errors: 0, Skipped: 0
+[INFO] 
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD FAILURE
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  6.225 s
+[INFO] Finished at: 2026-11-06T14:44:12-05:00
+[INFO] ------------------------------------------------------------------------
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-surefire-plugin:3.2.5:test (default-test) on project lab10-reservations: There are test failures.
+[ERROR] 
+[ERROR] Please refer to C:\Users\ziqix\downloads\f26-lab10\target\surefire-reports for the individual test results.
+[ERROR] Please refer to dump files (if any exist) [date].dump, [date]-jvmRun[N].dump and [date].dumpstream.
+[ERROR] -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException
+```
+
+#### Run 2
+
+```text
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] ------------------< edu.cmu.cs214:lab10-reservations >------------------
+[INFO] Building lab10-reservations 1.0.0
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- resources:3.4.0:resources (default-resources) @ lab10-reservations ---
+[INFO] skip non existing resourceDirectory C:\Users\ziqix\downloads\f26-lab10\src\main\resources
+[INFO] 
+[INFO] --- compiler:3.13.0:compile (default-compile) @ lab10-reservations ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- resources:3.4.0:testResources (default-testResources) @ lab10-reservations ---
+[INFO] skip non existing resourceDirectory C:\Users\ziqix\downloads\f26-lab10\src\test\resources
+[INFO] 
+[INFO] --- compiler:3.13.0:testCompile (default-testCompile) @ lab10-reservations ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- surefire:3.2.5:test (default-test) @ lab10-reservations ---
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO] 
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running edu.cmu.cs214.lab10.harness.RaceTest
+2026-11-06T19:44:19.062Z INFO booking.confirmed booking=bk-1 room=WEH-5409 start=540 end=600
+2026-11-06T19:44:19.072Z INFO booking.confirmed booking=bk-2 room=WEH-5409 start=540 end=600
+[ERROR] Tests run: 1, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 0.108 s <<< FAILURE! -- in edu.cmu.cs214.lab10.harness.RaceTest
+[ERROR] edu.cmu.cs214.lab10.harness.RaceTest.twoCustomersBookingTheSameSlotLeaveOneConfirmed -- Time elapsed: 0.069 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: expected: <1> but was: <2>
+	at org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:151)
+	at org.junit.jupiter.api.AssertionFailureBuilder.buildAndThrow(AssertionFailureBuilder.java:132)
+	at org.junit.jupiter.api.AssertEquals.failNotEqual(AssertEquals.java:197)
+	at org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:150)
+	at org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:145)
+	at org.junit.jupiter.api.Assertions.assertEquals(Assertions.java:531)
+	at edu.cmu.cs214.lab10.harness.RaceTest.twoCustomersBookingTheSameSlotLeaveOneConfirmed(RaceTest.java:48)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+
+[INFO] 
+[INFO] Results:
+[INFO] 
+[ERROR] Failures: 
+[ERROR]   RaceTest.twoCustomersBookingTheSameSlotLeaveOneConfirmed:48 expected: <1> but was: <2>
+[INFO] 
+[ERROR] Tests run: 1, Failures: 1, Errors: 0, Skipped: 0
+[INFO] 
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD FAILURE
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  3.905 s
+[INFO] Finished at: 2026-11-06T14:44:19-05:00
+[INFO] ------------------------------------------------------------------------
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-surefire-plugin:3.2.5:test (default-test) on project lab10-reservations: There are test failures.
+[ERROR] 
+[ERROR] Please refer to C:\Users\ziqix\downloads\f26-lab10\target\surefire-reports for the individual test results.
+[ERROR] Please refer to dump files (if any exist) [date].dump, [date]-jvmRun[N].dump and [date].dumpstream.
+[ERROR] -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException
+```
+
+#### Prediction vs what ran
+
+Run 1 and Run 2 show the log lines and the assertion, but not which thread did
+what. For that I ran the same schedule once more in a throwaway program, not
+committed, that printed each thread's state and result. Its evidence is marked
+"check" below.
+
+| Step | Predicted | What ran |
+|---|---|---|
+| t1-t2 | A makes call 1 and parks holding `false` | Match (check): `awaitPaused=true`, `hasOverlapCalls=1`, A was `TIMED_WAITING`. |
+| t3 | B's `hasOverlap` is call 2 and passes through | Match (check): `hasOverlapCalls=2`, and B was not held. |
+| t4-t5 | B inserts and logs `bk-1` | Match (check): B finished in 32 ms with A still parked, and A's result was still empty. B's result was CONFIRMED `bk-1`. |
+| t6-t8 | After `release()`, A inserts and logs `bk-2` on its stale `false` | Match (check): A's result was CONFIRMED `bk-2`. |
+| Log lines | `bk-1`, then `bk-2`, nothing else | Match in Run 1 and Run 2. |
+| Assertion | `expected: <1> but was: <2>` | Match in Run 1 and Run 2, exact text. |
+| End state | Two CONFIRMED bookings | Match (check): the store held `bk-1` and `bk-2`, both CONFIRMED for 540..600. |
+
+Differences: none in order, ids, outcomes or values. Two points the prediction
+did not cover:
+
+- The two log lines are 10 ms apart in both runs, against 1 ms in the ticket.
+  The prediction gave no gap. Here the gate holds A until B finishes, so this
+  gap reflects the test's schedule, not production timing.
+- The thread-by-thread match for t1-t8 comes from the separate check, not from
+  Run 1 or Run 2 themselves.
+
 ---
 
 ## Milestone 2: the patch a teammate sent
