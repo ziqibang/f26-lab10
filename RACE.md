@@ -115,12 +115,21 @@ that pair pins the schedule you predicted, and the output of two separate
 runs (assertion failure and log lines).
 
 `RaceTest.twoCustomersBookingTheSameSlotLeaveOneConfirmed` uses
-`new PausingStore(real, "hasOverlap", 1)`. Call 1 is A's check: `awaitPaused()`
-runs before B starts, so A must make it, and it parks A after the real call,
-holding `false`. B then checks and inserts inside that gap, and A inserts on the
-stale answer. Both runs are red on the invariant assertion at `RaceTest.java:48`,
-with `Errors: 0`. The test took 0.084 s and 0.069 s, far below the 2 s
-`PausingStore` timeout, so no timeout path was taken.
+`new PausingStore(real, "hasOverlap", 1)`. Call 1 is A's check: B does not start
+until A has parked, and `assertTrue(gated.awaitPaused(), ...)` fails the test if
+A never parks. The gate parks A after the real call, holding `false`. B then
+checks and inserts inside that gap, and A inserts on the stale answer. Both runs
+get past the parked check at `RaceTest.java:40` and are red on the invariant
+assertion at `RaceTest.java:49`, with `Errors: 0`. The test took 0.072 s and
+0.061 s, far below the 2 s `PausingStore` timeout, so no timeout path was taken.
+
+To confirm the parked check can fail, I temporarily aimed at `hasOverlap` call 3,
+which never happens. That run failed at line 40 with `customer A never parked in
+hasOverlap call 1`, after the 2 s timeout, and never reached the invariant
+assertion. The aim was then restored.
+
+These two runs replace the ones in commit 5cfa649, which predate the parked
+check.
 
 #### Run 1
 
@@ -152,10 +161,10 @@ with `Errors: 0`. The test took 0.084 s and 0.069 s, far below the 2 s
 [INFO]  T E S T S
 [INFO] -------------------------------------------------------
 [INFO] Running edu.cmu.cs214.lab10.harness.RaceTest
-2026-11-06T19:44:12.415Z INFO booking.confirmed booking=bk-1 room=WEH-5409 start=540 end=600
-2026-11-06T19:44:12.425Z INFO booking.confirmed booking=bk-2 room=WEH-5409 start=540 end=600
-[ERROR] Tests run: 1, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 0.118 s <<< FAILURE! -- in edu.cmu.cs214.lab10.harness.RaceTest
-[ERROR] edu.cmu.cs214.lab10.harness.RaceTest.twoCustomersBookingTheSameSlotLeaveOneConfirmed -- Time elapsed: 0.084 s <<< FAILURE!
+2026-11-06T19:47:17.329Z INFO booking.confirmed booking=bk-1 room=WEH-5409 start=540 end=600
+2026-11-06T19:47:17.338Z INFO booking.confirmed booking=bk-2 room=WEH-5409 start=540 end=600
+[ERROR] Tests run: 1, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 0.106 s <<< FAILURE! -- in edu.cmu.cs214.lab10.harness.RaceTest
+[ERROR] edu.cmu.cs214.lab10.harness.RaceTest.twoCustomersBookingTheSameSlotLeaveOneConfirmed -- Time elapsed: 0.072 s <<< FAILURE!
 org.opentest4j.AssertionFailedError: expected: <1> but was: <2>
 	at org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:151)
 	at org.junit.jupiter.api.AssertionFailureBuilder.buildAndThrow(AssertionFailureBuilder.java:132)
@@ -163,7 +172,7 @@ org.opentest4j.AssertionFailedError: expected: <1> but was: <2>
 	at org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:150)
 	at org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:145)
 	at org.junit.jupiter.api.Assertions.assertEquals(Assertions.java:531)
-	at edu.cmu.cs214.lab10.harness.RaceTest.twoCustomersBookingTheSameSlotLeaveOneConfirmed(RaceTest.java:48)
+	at edu.cmu.cs214.lab10.harness.RaceTest.twoCustomersBookingTheSameSlotLeaveOneConfirmed(RaceTest.java:49)
 	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
 	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
 	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
@@ -172,15 +181,15 @@ org.opentest4j.AssertionFailedError: expected: <1> but was: <2>
 [INFO] Results:
 [INFO] 
 [ERROR] Failures: 
-[ERROR]   RaceTest.twoCustomersBookingTheSameSlotLeaveOneConfirmed:48 expected: <1> but was: <2>
+[ERROR]   RaceTest.twoCustomersBookingTheSameSlotLeaveOneConfirmed:49 expected: <1> but was: <2>
 [INFO] 
 [ERROR] Tests run: 1, Failures: 1, Errors: 0, Skipped: 0
 [INFO] 
 [INFO] ------------------------------------------------------------------------
 [INFO] BUILD FAILURE
 [INFO] ------------------------------------------------------------------------
-[INFO] Total time:  6.225 s
-[INFO] Finished at: 2026-11-06T14:44:12-05:00
+[INFO] Total time:  5.341 s
+[INFO] Finished at: 2026-11-06T14:47:17-05:00
 [INFO] ------------------------------------------------------------------------
 [ERROR] Failed to execute goal org.apache.maven.plugins:maven-surefire-plugin:3.2.5:test (default-test) on project lab10-reservations: There are test failures.
 [ERROR] 
@@ -224,10 +233,10 @@ org.opentest4j.AssertionFailedError: expected: <1> but was: <2>
 [INFO]  T E S T S
 [INFO] -------------------------------------------------------
 [INFO] Running edu.cmu.cs214.lab10.harness.RaceTest
-2026-11-06T19:44:19.062Z INFO booking.confirmed booking=bk-1 room=WEH-5409 start=540 end=600
-2026-11-06T19:44:19.072Z INFO booking.confirmed booking=bk-2 room=WEH-5409 start=540 end=600
-[ERROR] Tests run: 1, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 0.108 s <<< FAILURE! -- in edu.cmu.cs214.lab10.harness.RaceTest
-[ERROR] edu.cmu.cs214.lab10.harness.RaceTest.twoCustomersBookingTheSameSlotLeaveOneConfirmed -- Time elapsed: 0.069 s <<< FAILURE!
+2026-11-06T19:47:22.332Z INFO booking.confirmed booking=bk-1 room=WEH-5409 start=540 end=600
+2026-11-06T19:47:22.340Z INFO booking.confirmed booking=bk-2 room=WEH-5409 start=540 end=600
+[ERROR] Tests run: 1, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 0.098 s <<< FAILURE! -- in edu.cmu.cs214.lab10.harness.RaceTest
+[ERROR] edu.cmu.cs214.lab10.harness.RaceTest.twoCustomersBookingTheSameSlotLeaveOneConfirmed -- Time elapsed: 0.061 s <<< FAILURE!
 org.opentest4j.AssertionFailedError: expected: <1> but was: <2>
 	at org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:151)
 	at org.junit.jupiter.api.AssertionFailureBuilder.buildAndThrow(AssertionFailureBuilder.java:132)
@@ -235,7 +244,7 @@ org.opentest4j.AssertionFailedError: expected: <1> but was: <2>
 	at org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:150)
 	at org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:145)
 	at org.junit.jupiter.api.Assertions.assertEquals(Assertions.java:531)
-	at edu.cmu.cs214.lab10.harness.RaceTest.twoCustomersBookingTheSameSlotLeaveOneConfirmed(RaceTest.java:48)
+	at edu.cmu.cs214.lab10.harness.RaceTest.twoCustomersBookingTheSameSlotLeaveOneConfirmed(RaceTest.java:49)
 	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
 	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
 	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
@@ -244,15 +253,15 @@ org.opentest4j.AssertionFailedError: expected: <1> but was: <2>
 [INFO] Results:
 [INFO] 
 [ERROR] Failures: 
-[ERROR]   RaceTest.twoCustomersBookingTheSameSlotLeaveOneConfirmed:48 expected: <1> but was: <2>
+[ERROR]   RaceTest.twoCustomersBookingTheSameSlotLeaveOneConfirmed:49 expected: <1> but was: <2>
 [INFO] 
 [ERROR] Tests run: 1, Failures: 1, Errors: 0, Skipped: 0
 [INFO] 
 [INFO] ------------------------------------------------------------------------
 [INFO] BUILD FAILURE
 [INFO] ------------------------------------------------------------------------
-[INFO] Total time:  3.905 s
-[INFO] Finished at: 2026-11-06T14:44:19-05:00
+[INFO] Total time:  2.491 s
+[INFO] Finished at: 2026-11-06T14:47:22-05:00
 [INFO] ------------------------------------------------------------------------
 [ERROR] Failed to execute goal org.apache.maven.plugins:maven-surefire-plugin:3.2.5:test (default-test) on project lab10-reservations: There are test failures.
 [ERROR] 
@@ -269,29 +278,35 @@ org.opentest4j.AssertionFailedError: expected: <1> but was: <2>
 
 #### Prediction vs what ran
 
-Run 1 and Run 2 show the log lines and the assertion, but not which thread did
-what. For that I ran the same schedule once more in a throwaway program, not
-committed, that printed each thread's state and result. Its evidence is marked
-"check" below.
+Log lines, Run 1 and Run 2: `bk-1` confirmed first (thread B), then `bk-2`
+(thread A), with no `booking.rejected`, `booking.waitlisted` or
+`booking.promoted` line. This matches the prediction.
+
+The log lines do not name threads. The test fixes the attribution: A is held
+until `release()`, which runs only after `customerB.join`, and neither bounded
+wait expired, so the first line must be B's and the second A's. Steps marked
+"check" also rest on a throwaway program, not committed, that ran the same
+schedule once on the same production code and printed each thread's state and
+result.
 
 | Step | Predicted | What ran |
 |---|---|---|
-| t1-t2 | A makes call 1 and parks holding `false` | Match (check): `awaitPaused=true`, `hasOverlapCalls=1`, A was `TIMED_WAITING`. |
+| t1-t2 | A makes call 1 and parks holding `false` | Match: the test's parked check passed in both runs. Check: `awaitPaused=true`, `hasOverlapCalls=1`, A was `TIMED_WAITING`. |
 | t3 | B's `hasOverlap` is call 2 and passes through | Match (check): `hasOverlapCalls=2`, and B was not held. |
-| t4-t5 | B inserts and logs `bk-1` | Match (check): B finished in 32 ms with A still parked, and A's result was still empty. B's result was CONFIRMED `bk-1`. |
-| t6-t8 | After `release()`, A inserts and logs `bk-2` on its stale `false` | Match (check): A's result was CONFIRMED `bk-2`. |
-| Log lines | `bk-1`, then `bk-2`, nothing else | Match in Run 1 and Run 2. |
+| t4-t5 | B inserts and logs `bk-1` | Match: `bk-1` is logged first in both runs. Check: B finished in 32 ms with A still parked, and B's result was CONFIRMED `bk-1`. |
+| t6-t8 | After `release()`, A inserts and logs `bk-2` on its stale `false` | Match: `bk-2` is logged second in both runs. Check: A's result was CONFIRMED `bk-2`. |
+| Log lines | `bk-1` (B), then `bk-2` (A), nothing else | Match in Run 1 and Run 2. |
 | Assertion | `expected: <1> but was: <2>` | Match in Run 1 and Run 2, exact text. |
-| End state | Two CONFIRMED bookings | Match (check): the store held `bk-1` and `bk-2`, both CONFIRMED for 540..600. |
+| End state | Two CONFIRMED bookings | Match: the assertion counted 2. Check: the store held `bk-1` and `bk-2`, both CONFIRMED for 540..600. |
 
 Differences: none in order, ids, outcomes or values. Two points the prediction
 did not cover:
 
-- The two log lines are 10 ms apart in both runs, against 1 ms in the ticket.
-  The prediction gave no gap. Here the gate holds A until B finishes, so this
-  gap reflects the test's schedule, not production timing.
-- The thread-by-thread match for t1-t8 comes from the separate check, not from
-  Run 1 or Run 2 themselves.
+- The two log lines are 9 ms apart in Run 1 and 8 ms apart in Run 2, against 1 ms
+  in the ticket. The prediction gave no gap. Here the gate holds A until B
+  finishes, so this gap reflects the test's schedule, not production timing.
+- The prediction did not include the parked check. I added it after the first
+  two runs, because `awaitPaused()` could otherwise time out unnoticed.
 
 ---
 

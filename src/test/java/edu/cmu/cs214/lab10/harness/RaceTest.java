@@ -1,6 +1,7 @@
 package edu.cmu.cs214.lab10.harness;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import edu.cmu.cs214.lab10.domain.Booking;
 import edu.cmu.cs214.lab10.domain.BookingStatus;
@@ -36,7 +37,7 @@ class RaceTest {
 
         Thread customerA = new Thread(() -> service.book(WEAN, START_MINUTE, END_MINUTE), "customer-A");
         customerA.start();
-        gated.awaitPaused();
+        assertTrue(gated.awaitPaused(), "customer A never parked in hasOverlap call 1");
 
         Thread customerB = new Thread(() -> service.book(WEAN, START_MINUTE, END_MINUTE), "customer-B");
         customerB.start();
