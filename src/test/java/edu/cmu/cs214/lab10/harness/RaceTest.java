@@ -24,20 +24,20 @@ class RaceTest {
     private static final List<Room> ROOMS = List.of(new Room(WEAN, "Wean 5409", 12));
 
     /**
-     * RES-4471: the schedule predicted in RACE.md. A parks holding the answer
-     * from the first hasOverlap, B books the slot, then A resumes and inserts
-     * on that stale answer. The assertion is on the end state only, so it stays
-     * meaningful after book() changes underneath it.
+     * RES-4471. A parks just after its insertIfFree, B books the same slot while
+     * A is parked, then A resumes. The gate parks after the atomic step, so this
+     * cannot split that step; see RACE.md milestone 3 for what it does show. The
+     * assertion is on the end state only.
      */
     @Test
     void twoCustomersBookingTheSameSlotLeaveOneConfirmed() throws InterruptedException {
         InMemoryBookingStore real = new InMemoryBookingStore();
-        PausingStore gated = new PausingStore(real, "hasOverlap", 1);
+        PausingStore gated = new PausingStore(real, "insertIfFree", 1);
         BookingService service = new BookingService(gated, ROOMS);
 
         Thread customerA = new Thread(() -> service.book(WEAN, START_MINUTE, END_MINUTE), "customer-A");
         customerA.start();
-        assertTrue(gated.awaitPaused(), "customer A never parked in hasOverlap call 1");
+        assertTrue(gated.awaitPaused(), "customer A never parked in insertIfFree call 1");
 
         Thread customerB = new Thread(() -> service.book(WEAN, START_MINUTE, END_MINUTE), "customer-B");
         customerB.start();
@@ -50,20 +50,19 @@ class RaceTest {
     }
 
     /**
-     * The re-aimed schedule from RACE.md milestone 2. A starts alone, so calls 1
-     * and 2 are both A's, and call 2 needs a book() that checks twice: the
-     * patched code. A parks holding its re-check answer, B books the slot, then
-     * A inserts on that stale answer.
+     * Milestone 2's re-aimed test. Its target, a re-check before the insert, no
+     * longer exists, so it now aims at the same step as the test above. A parks
+     * just after its insertIfFree, B books while A is parked, then A resumes.
      */
     @Test
     void aReCheckBeforeInsertStillLeavesOneConfirmed() throws InterruptedException {
         InMemoryBookingStore real = new InMemoryBookingStore();
-        PausingStore gated = new PausingStore(real, "hasOverlap", 2);
+        PausingStore gated = new PausingStore(real, "insertIfFree", 1);
         BookingService service = new BookingService(gated, ROOMS);
 
         Thread customerA = new Thread(() -> service.book(WEAN, START_MINUTE, END_MINUTE), "customer-A");
         customerA.start();
-        assertTrue(gated.awaitPaused(), "customer A never parked in hasOverlap call 2");
+        assertTrue(gated.awaitPaused(), "customer A never parked in insertIfFree call 1");
 
         Thread customerB = new Thread(() -> service.book(WEAN, START_MINUTE, END_MINUTE), "customer-B");
         customerB.start();
@@ -111,8 +110,8 @@ class RaceTest {
     //   new PausingStore(real, "bookingsForRoom", 1)   // park call 1
     //   new PausingStore(real, "insert", 3)            // park call 3 of insert
     //
-    // Valid method names are the four on BookingStore: hasOverlap, insert,
-    // bookingsForRoom, cancelAndPromote. On the chosen call the wrapper
+    // Valid method names are the five on BookingStore: hasOverlap, insert,
+    // insertIfFree, bookingsForRoom, cancelAndPromote. On the chosen call the wrapper
     // delegates, then parks the calling thread before returning the answer it
     // already computed. The gate fires once and once only.
     // ------------------------------------------------------------------
