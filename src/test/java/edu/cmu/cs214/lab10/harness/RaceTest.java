@@ -49,6 +49,32 @@ class RaceTest {
         assertEquals(1, confirmedCount(real));
     }
 
+    /**
+     * The re-aimed schedule from RACE.md milestone 2. A starts alone, so calls 1
+     * and 2 are both A's, and call 2 needs a book() that checks twice: the
+     * patched code. A parks holding its re-check answer, B books the slot, then
+     * A inserts on that stale answer.
+     */
+    @Test
+    void aReCheckBeforeInsertStillLeavesOneConfirmed() throws InterruptedException {
+        InMemoryBookingStore real = new InMemoryBookingStore();
+        PausingStore gated = new PausingStore(real, "hasOverlap", 2);
+        BookingService service = new BookingService(gated, ROOMS);
+
+        Thread customerA = new Thread(() -> service.book(WEAN, START_MINUTE, END_MINUTE), "customer-A");
+        customerA.start();
+        assertTrue(gated.awaitPaused(), "customer A never parked in hasOverlap call 2");
+
+        Thread customerB = new Thread(() -> service.book(WEAN, START_MINUTE, END_MINUTE), "customer-B");
+        customerB.start();
+        customerB.join(PausingStore.TIMEOUT_MILLIS);
+
+        gated.release();
+        customerA.join(PausingStore.TIMEOUT_MILLIS);
+
+        assertEquals(1, confirmedCount(real));
+    }
+
     private static int confirmedCount(InMemoryBookingStore store) {
         int count = 0;
         for (Booking booking : store.bookingsForRoom(WEAN)) {

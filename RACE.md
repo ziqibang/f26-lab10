@@ -314,11 +314,356 @@ did not cover:
 
 **Your milestone-1 test on the patched code.** Green or red. Paste the result.
 
+**Green, twice.** Same test, same aim (`hasOverlap`, call 1), with
+`proposed-fix.diff` applied through `git apply` and not committed. The gate fired
+in both runs: the parked check at `RaceTest.java:40` passed. The invariant held
+for this schedule: `assertEquals(1, ...)` passed with one CONFIRMED booking.
+
+After the patch `book()` calls `hasOverlap`, then `hasOverlap` again, then
+`insert`. The patch adds the second check and changes nothing else.
+
+#### Patched Run 1
+
+```text
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] ------------------< edu.cmu.cs214:lab10-reservations >------------------
+[INFO] Building lab10-reservations 1.0.0
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- resources:3.4.0:resources (default-resources) @ lab10-reservations ---
+[INFO] skip non existing resourceDirectory C:\Users\ziqix\downloads\f26-lab10\src\main\resources
+[INFO] 
+[INFO] --- compiler:3.13.0:compile (default-compile) @ lab10-reservations ---
+[INFO] Recompiling the module because of changed source code.
+[INFO] Compiling 11 source files with javac [debug release 21] to target\classes
+[INFO] 
+[INFO] --- resources:3.4.0:testResources (default-testResources) @ lab10-reservations ---
+[INFO] skip non existing resourceDirectory C:\Users\ziqix\downloads\f26-lab10\src\test\resources
+[INFO] 
+[INFO] --- compiler:3.13.0:testCompile (default-testCompile) @ lab10-reservations ---
+[INFO] Recompiling the module because of changed dependency.
+[INFO] Compiling 3 source files with javac [debug release 21] to target\test-classes
+[INFO] 
+[INFO] --- surefire:3.2.5:test (default-test) @ lab10-reservations ---
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO] 
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running edu.cmu.cs214.lab10.harness.RaceTest
+2026-11-06T19:50:27.137Z INFO booking.confirmed booking=bk-1 room=WEH-5409 start=540 end=600
+2026-11-06T19:50:27.151Z INFO booking.rejected room=WEH-5409 start=540 end=600 reason=slot already held
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.080 s -- in edu.cmu.cs214.lab10.harness.RaceTest
+[INFO] 
+[INFO] Results:
+[INFO] 
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0
+[INFO] 
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  5.579 s
+[INFO] Finished at: 2026-11-06T14:50:27-05:00
+[INFO] ------------------------------------------------------------------------
+```
+
+#### Patched Run 2
+
+```text
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] ------------------< edu.cmu.cs214:lab10-reservations >------------------
+[INFO] Building lab10-reservations 1.0.0
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- resources:3.4.0:resources (default-resources) @ lab10-reservations ---
+[INFO] skip non existing resourceDirectory C:\Users\ziqix\downloads\f26-lab10\src\main\resources
+[INFO] 
+[INFO] --- compiler:3.13.0:compile (default-compile) @ lab10-reservations ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- resources:3.4.0:testResources (default-testResources) @ lab10-reservations ---
+[INFO] skip non existing resourceDirectory C:\Users\ziqix\downloads\f26-lab10\src\test\resources
+[INFO] 
+[INFO] --- compiler:3.13.0:testCompile (default-testCompile) @ lab10-reservations ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- surefire:3.2.5:test (default-test) @ lab10-reservations ---
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO] 
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running edu.cmu.cs214.lab10.harness.RaceTest
+2026-11-06T19:50:32.078Z INFO booking.confirmed booking=bk-1 room=WEH-5409 start=540 end=600
+2026-11-06T19:50:32.094Z INFO booking.rejected room=WEH-5409 start=540 end=600 reason=slot already held
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.107 s -- in edu.cmu.cs214.lab10.harness.RaceTest
+[INFO] 
+[INFO] Results:
+[INFO] 
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0
+[INFO] 
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  2.819 s
+[INFO] Finished at: 2026-11-06T14:50:32-05:00
+[INFO] ------------------------------------------------------------------------
+```
+
+#### What this result does and does not prove
+
+Both runs log `bk-1` confirmed, then one `booking.rejected`. A is parked until B
+has finished, so the confirmation is B's and the rejection is A's. A's stale
+`false` from call 1 still reached `book`, but A's new second check saw `bk-1` and
+rejected.
+
+**It proves** that one interleaving is closed: B running completely between A's
+first check and A's second check no longer double-books.
+
+**It does not prove the race is fixed.** The aim parks the first check, whose
+answer no longer leads straight to the insert. The patch adds a check but does
+not make the last check and the insert one atomic step: `hasOverlap` and `insert`
+are still separately locked calls, so a gap remains after the second check. This
+test cannot see that gap, because it never pauses there.
+
+The other green results do not settle it either. The full suite passing (12 of
+12) only adds this one schedule to tests that run one caller at a time. The
+teammate's clean stress runs cannot show the gap is gone, since a shorter gap
+would also fail less often. Stress results on the patch are in the verdict.
+
+The gap after the second check is exercised in the re-aimed run below.
+
 **The re-aimed run.** Method name, call index, the pasted result, and one line
 on why that aim tests the patch rather than sidestepping it.
 
+#### Prediction for the re-aimed run (written before the test existed)
+
+Aim: `new PausingStore(real, "hasOverlap", 2)`, on patched code. Both threads call
+`book("WEH-5409", 540, 600)`.
+
+| Step | Thread A | Thread B |
+|---|---|---|
+| t1 | `hasOverlap`, call 1, returns `false`. `nextId()` gives `bk-1`. | |
+| t2 | `hasOverlap`, call 2 (the re-check), computes `false`. The gate parks A holding it. **The re-check and insert are separated from here until t6.** | |
+| t3 | | `hasOverlap`, call 3, returns `false`. `nextId()` gives `bk-2`. |
+| t4 | | `hasOverlap`, call 4, returns `false`. `insert(bk-2, CONFIRMED)` runs. |
+| t5 | | Logs `booking.confirmed booking=bk-2`. `book` returns CONFIRMED. |
+| t6 | The test calls `release()`. The re-check returns the stale `false`, although `bk-2` holds the slot. | |
+| t7 | `insert(bk-1, CONFIRMED)` runs. Nothing rechecks. | |
+| t8 | Logs `booking.confirmed booking=bk-1`. `book` returns CONFIRMED. | |
+| | **End state:** two CONFIRMED bookings, `bk-1` and `bk-2`, for WEH-5409 540..600. | |
+
+Why call 2 is A's re-check and not one of B's calls: the count runs across all
+threads, but B does not exist yet. A starts alone and the test blocks on
+`awaitPaused()` until the gate fires. So calls 1 and 2 can only be A's, and B's
+two checks are calls 3 and 4. The gate is one shot, so B passes through.
+
+Expected log lines, in this order, with no `booking.rejected`,
+`booking.waitlisted` or `booking.promoted` line (timestamps will vary):
+
+```
+<timestamp> INFO booking.confirmed booking=bk-2 room=WEH-5409 start=540 end=600
+<timestamp> INFO booking.confirmed booking=bk-1 room=WEH-5409 start=540 end=600
+```
+
+The ids are the reverse of milestone 1: `nextId()` runs before the re-check, so A
+takes `bk-1` before parking, yet B logs first.
+
+Expected result: the parked check passes, then the end-state assertion fails with
+`expected: <1> but was: <2>`.
+
+#### Re-aimed result
+
+`RaceTest.aReCheckBeforeInsertStillLeavesOneConfirmed`, aim `hasOverlap` call 2,
+on patched code: **red, twice.** The parked check passed, so A held its re-check
+answer, and the end-state assertion failed at `RaceTest.java:75` with
+`expected: <1> but was: <2>` and `Errors: 0`. The test took 0.054 s and 0.039 s,
+so no timeout path was taken.
+
+This tests the patch rather than sidestepping it because it pauses at the patch's
+own re-check, the last read before the insert, and lets that answer go stale.
+
+The run matched the prediction, including the order: `bk-2` (B) logs first and
+`bk-1` (A) second, with no rejected, waitlisted or promoted line. One point the
+prediction did not cover: in both runs the two lines carry the same millisecond,
+closer to the ticket's 1 ms gap than milestone 1's 8-9 ms.
+
+#### Re-aimed Run 1
+
+```text
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] ------------------< edu.cmu.cs214:lab10-reservations >------------------
+[INFO] Building lab10-reservations 1.0.0
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- resources:3.4.0:resources (default-resources) @ lab10-reservations ---
+[INFO] skip non existing resourceDirectory C:\Users\ziqix\downloads\f26-lab10\src\main\resources
+[INFO] 
+[INFO] --- compiler:3.13.0:compile (default-compile) @ lab10-reservations ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- resources:3.4.0:testResources (default-testResources) @ lab10-reservations ---
+[INFO] skip non existing resourceDirectory C:\Users\ziqix\downloads\f26-lab10\src\test\resources
+[INFO] 
+[INFO] --- compiler:3.13.0:testCompile (default-testCompile) @ lab10-reservations ---
+[INFO] Recompiling the module because of changed source code.
+[INFO] Compiling 3 source files with javac [debug release 21] to target\test-classes
+[INFO] 
+[INFO] --- surefire:3.2.5:test (default-test) @ lab10-reservations ---
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO] 
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running edu.cmu.cs214.lab10.harness.RaceTest
+2026-11-06T19:52:53.670Z INFO booking.confirmed booking=bk-2 room=WEH-5409 start=540 end=600
+2026-11-06T19:52:53.670Z INFO booking.confirmed booking=bk-1 room=WEH-5409 start=540 end=600
+[ERROR] Tests run: 1, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 0.081 s <<< FAILURE! -- in edu.cmu.cs214.lab10.harness.RaceTest
+[ERROR] edu.cmu.cs214.lab10.harness.RaceTest.aReCheckBeforeInsertStillLeavesOneConfirmed -- Time elapsed: 0.054 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: expected: <1> but was: <2>
+	at org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:151)
+	at org.junit.jupiter.api.AssertionFailureBuilder.buildAndThrow(AssertionFailureBuilder.java:132)
+	at org.junit.jupiter.api.AssertEquals.failNotEqual(AssertEquals.java:197)
+	at org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:150)
+	at org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:145)
+	at org.junit.jupiter.api.Assertions.assertEquals(Assertions.java:531)
+	at edu.cmu.cs214.lab10.harness.RaceTest.aReCheckBeforeInsertStillLeavesOneConfirmed(RaceTest.java:75)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+
+[INFO] 
+[INFO] Results:
+[INFO] 
+[ERROR] Failures: 
+[ERROR]   RaceTest.aReCheckBeforeInsertStillLeavesOneConfirmed:75 expected: <1> but was: <2>
+[INFO] 
+[ERROR] Tests run: 1, Failures: 1, Errors: 0, Skipped: 0
+[INFO] 
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD FAILURE
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  4.316 s
+[INFO] Finished at: 2026-11-06T14:52:53-05:00
+[INFO] ------------------------------------------------------------------------
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-surefire-plugin:3.2.5:test (default-test) on project lab10-reservations: There are test failures.
+[ERROR] 
+[ERROR] Please refer to C:\Users\ziqix\downloads\f26-lab10\target\surefire-reports for the individual test results.
+[ERROR] Please refer to dump files (if any exist) [date].dump, [date]-jvmRun[N].dump and [date].dumpstream.
+[ERROR] -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException
+```
+
+#### Re-aimed Run 2
+
+```text
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] ------------------< edu.cmu.cs214:lab10-reservations >------------------
+[INFO] Building lab10-reservations 1.0.0
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- resources:3.4.0:resources (default-resources) @ lab10-reservations ---
+[INFO] skip non existing resourceDirectory C:\Users\ziqix\downloads\f26-lab10\src\main\resources
+[INFO] 
+[INFO] --- compiler:3.13.0:compile (default-compile) @ lab10-reservations ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- resources:3.4.0:testResources (default-testResources) @ lab10-reservations ---
+[INFO] skip non existing resourceDirectory C:\Users\ziqix\downloads\f26-lab10\src\test\resources
+[INFO] 
+[INFO] --- compiler:3.13.0:testCompile (default-testCompile) @ lab10-reservations ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- surefire:3.2.5:test (default-test) @ lab10-reservations ---
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO] 
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running edu.cmu.cs214.lab10.harness.RaceTest
+2026-11-06T19:52:57.861Z INFO booking.confirmed booking=bk-2 room=WEH-5409 start=540 end=600
+2026-11-06T19:52:57.861Z INFO booking.confirmed booking=bk-1 room=WEH-5409 start=540 end=600
+[ERROR] Tests run: 1, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 0.079 s <<< FAILURE! -- in edu.cmu.cs214.lab10.harness.RaceTest
+[ERROR] edu.cmu.cs214.lab10.harness.RaceTest.aReCheckBeforeInsertStillLeavesOneConfirmed -- Time elapsed: 0.039 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: expected: <1> but was: <2>
+	at org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:151)
+	at org.junit.jupiter.api.AssertionFailureBuilder.buildAndThrow(AssertionFailureBuilder.java:132)
+	at org.junit.jupiter.api.AssertEquals.failNotEqual(AssertEquals.java:197)
+	at org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:150)
+	at org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:145)
+	at org.junit.jupiter.api.Assertions.assertEquals(Assertions.java:531)
+	at edu.cmu.cs214.lab10.harness.RaceTest.aReCheckBeforeInsertStillLeavesOneConfirmed(RaceTest.java:75)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+
+[INFO] 
+[INFO] Results:
+[INFO] 
+[ERROR] Failures: 
+[ERROR]   RaceTest.aReCheckBeforeInsertStillLeavesOneConfirmed:75 expected: <1> but was: <2>
+[INFO] 
+[ERROR] Tests run: 1, Failures: 1, Errors: 0, Skipped: 0
+[INFO] 
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD FAILURE
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  2.070 s
+[INFO] Finished at: 2026-11-06T14:52:57-05:00
+[INFO] ------------------------------------------------------------------------
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-surefire-plugin:3.2.5:test (default-test) on project lab10-reservations: There are test failures.
+[ERROR] 
+[ERROR] Please refer to C:\Users\ziqix\downloads\f26-lab10\target\surefire-reports for the individual test results.
+[ERROR] Please refer to dump files (if any exist) [date].dump, [date]-jvmRun[N].dump and [date].dumpstream.
+[ERROR] -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException
+```
+
 **Your verdict.** Accept or reject, and what your milestone-1 result does and
 does not show about the patch.
+
+**REJECT.** The re-aimed test reaches two CONFIRMED bookings for the same room and
+time on every run, so the patch does not fix RES-4471.
+
+- **What it closes:** one schedule. B running completely between A's first check
+  and A's re-check is now caught, which is why the milestone-1 test goes green.
+  That result shows only this schedule is closed.
+- **What it leaves open:** the gap between the re-check and the insert.
+  `hasOverlap` and `insert` are still two separately locked calls, so any answer
+  can go stale before the write. Adding a read makes the gap shorter, and no number
+  of reads removes it. The patch's comment, "no window left", is wrong.
+- **Why the teammate's evidence missed it:** the suite they ran had no concurrent
+  test at all, so it could not see any race. Stress runs depend on timing, and the
+  patch shrinks the gap, so bad rounds become rare rather than impossible. On
+  patched code, 3 runs of 100 rounds and 2 of 2000 gave 4 clean runs and 1 bad round
+  in 4,300, against 21 in 300 before the patch. Clean runs are what you would expect
+  to see from a patch that does not work.
+- **`book()` vs `cancelAndPromote`:** still open for the same reason. Nothing
+  makes `book()`'s last check and its insert one step, so a promotion can land
+  between them. In a one-off check, not committed, with X holding 600..660 and W
+  waitlisted for 540..660, I parked `book(540, 600)` at call 2 and cancelled X. W
+  was promoted, A then inserted `bk-1`, and both were CONFIRMED over 540..599.
+
+A real fix has to make the check and the insert one atomic step, covering every
+writer of CONFIRMED, not add more reads.
 
 ---
 

@@ -1,11 +1,4 @@
 # Project rules
 
-## Off-limits file: proposed-fix.diff
-
-Do NOT open, read, cat, grep, diff, or search inside `proposed-fix.diff` until
-the user explicitly says "milestone 2".
-
-- Exclude it from every search, e.g. `grep --exclude=proposed-fix.diff` or
-  `rg --glob '!proposed-fix.diff'` (and the Grep tool's `glob` parameter).
-- This also applies to indirect access: `git diff`, `git show`, `git log -p`,
-  or any recursive read that would print its contents, and to subagents.
+The restriction on reading `proposed-fix.diff` was lifted at milestone 2 on
+2026-11-06. The file may be opened and searched normally.
